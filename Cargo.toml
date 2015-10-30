@@ -1,0 +1,8 @@
+[package]
+name = "bender"
+version = "0.1.0"
+authors = ["Simon Cruanes <simon.cruanes.2007@m4x.org>"]
+
+[dependencies]
+
+irc = "0.9.1"
