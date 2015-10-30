@@ -1,5 +1,10 @@
 
 extern crate irc;
+extern crate nanomsg;
+
+extern crate bender; // interface to plugins
+
+use bender::*;
 
 use std::default::Default;
 use irc::client::prelude as client;
@@ -8,7 +13,11 @@ use irc::client::server::utils::ServerExt;
 use std::sync::Arc;
 
 pub type NetIrcServer = irc::client::server::NetIrcServer;
+pub type Message = irc::client::data::Message;
 
+// TODO: parse config from a file, if asked on the command-line?
+
+/// Create the configuration
 pub fn mk_config() -> client::Config {
     let mut c: client::Config = Default::default();
     c.nickname = Some("bender".to_string());
@@ -18,8 +27,18 @@ pub fn mk_config() -> client::Config {
     c
 }
 
+/// Handle a received message, dispatching it to plugins
+pub fn handle_msg(
+    conn: &NetIrcServer,
+    plugins: &mut PluginSet,
+    msg: Message
+) -> Result<()> {
+    // TODO
+    Ok(())    
+}
+
 /// Main listening loop
-pub fn main_loop() -> std::io::Result<()> {
+pub fn main_loop() -> Result<()> {
     let c = mk_config();
     let conn = Arc::new(try!(client::IrcServer::from_config(c)));
     try!(conn.identify());
@@ -32,14 +51,18 @@ pub fn main_loop() -> std::io::Result<()> {
             conn2.send_join("#sac").unwrap();
         })
     };
+    let mut plugins = try!(PluginSet::new());
     for msg in conn.iter() {
         let msg = try!(msg);
-        println!("received message {:?}", msg);
+        try!(handle_msg(&conn, &mut plugins, msg));
     }
     g.join(); // wait for thread
     Ok(())
 }
 
 fn main() {
-    main_loop().unwrap();
+    main_loop().unwrap_or_else(|e| {
+        println!("error: {}", e);
+        std::process::exit(1);
+    });
 }
