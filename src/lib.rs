@@ -3,16 +3,19 @@
 extern crate nanomsg;
 extern crate rustc_serialize;  // serialization into/from JSON
 
+use std::io::{Read,Write};
 use std::sync::Arc;
 use std::vec::Vec;
 use nanomsg::{Socket,Protocol,Endpoint};
 use rustc_serialize::json;
+use rustc_serialize::json::Json;
 
 /// The Error type for Bender
 #[derive(Debug)]
 pub enum Error {
     IO(std::io::Error),
     Nano(nanomsg::Error),
+    Serialize(String), // printed error, don't bother with subtleties
 }
 
 impl std::fmt::Display for Error {
@@ -23,6 +26,7 @@ impl std::fmt::Display for Error {
         match *self {
             Error::IO(ref e) => write!(out, "IO error: {}", e),
             Error::Nano(ref e) => write!(out, "nanomsg error: {}", e),
+            Error::Serialize(ref e) => write!(out, "serialize error: {}", e),
         }
     }
 }
@@ -33,6 +37,18 @@ impl From<std::io::Error> for Error {
 impl From<nanomsg::Error> for Error {
     fn from(e: nanomsg::Error) -> Error { Error::Nano(e) }
 }
+impl From<json::DecoderError> for Error {
+    fn from(e: json::DecoderError) -> Error {
+        Error::Serialize(e.to_string()) }
+}
+impl From<json::EncoderError> for Error {
+    fn from(e: json::EncoderError) -> Error {
+        Error::Serialize(e.to_string()) }
+}
+impl From<json::ParserError> for Error {
+    fn from(e: json::ParserError) -> Error {
+        Error::Serialize(e.to_string()) }
+}
 
 /// Make `Error` a proper error type
 impl std::error::Error for Error {
@@ -40,12 +56,14 @@ impl std::error::Error for Error {
         match *self{
             Error::IO(ref e) => e.description(),
             Error::Nano(ref e) => e.description(),
+            Error::Serialize(ref e) => e,
         }
     }
     fn cause(&self) -> Option<&std::error::Error> {
         match *self {
             Error::IO(ref e) => Some(e),
             Error::Nano(ref e) => Some(e),
+            Error::Serialize(_) => None,
         }
     }
 }
@@ -72,6 +90,7 @@ pub enum Command {
 
 /// A (connection to a) plugin
 pub struct Plugin {
+    buf: String, // buffer for reading
     pull: Socket, // Get commands
     endpoint: Endpoint,
     path: String, // path of the plugin program
@@ -86,11 +105,20 @@ impl Plugin {
         let mut pull = try!(Socket::new(Protocol::Pull));
         let mut endpoint = try!(pull.bind("ipc:///tmp/bender.ipc"));
         Ok(Plugin {
+            buf: String::with_capacity(256),
             pull: pull,
             endpoint: endpoint,
             path: p.to_string(),
             subproc: subproc,
         })
+    }
+
+    /// Read a command sent by the plugin
+    pub fn recv_command(&mut self) -> Result<Command> {
+        self.buf.clear();
+        try!(self.pull.read_to_string(&mut self.buf));
+        let cmd: Command = try!(json::decode(&self.buf));
+        Ok(cmd)
     }
 }
 
@@ -102,7 +130,7 @@ pub struct PluginSet {
 }
 
 impl PluginSet {
-    /// Create an empty set
+    /// Create an empty set of plugins.
     pub fn new() -> Result<PluginSet> {
         let mut push = try!(Socket::new(Protocol::Push));
         let mut endpoint = try!(push.bind("ipc:///tmp/bender.ipc"));
@@ -113,6 +141,12 @@ impl PluginSet {
         })
     }
 
+    /// Transmit an event to the plugin.
+    pub fn send_event(&mut self, msg: Event) -> Result<()> {
+        let json = json::encode(&msg).unwrap();
+        try!(self.push.write(json.as_bytes()));
+        Ok(())
+    }
 }
 
 // ## Communication from Bender to Plugin
