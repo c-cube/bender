@@ -34,7 +34,7 @@ pub fn handle_msg(
     msg: Message
 ) -> Result<()> {
     // TODO
-    Ok(())    
+    Ok(())
 }
 
 /// Main listening loop

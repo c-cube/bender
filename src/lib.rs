@@ -78,6 +78,8 @@ pub enum Event {
     Joined {chan: String},
 }
 
+unsafe impl Send for Event {}
+
 /// A command sent by a plugin, to Bender
 #[derive(RustcDecodable, RustcEncodable,Clone,Debug)]
 pub enum Command {
@@ -87,6 +89,8 @@ pub enum Command {
     Reconnect, // reconnect to IRC
     Exit, // disconnect
 }
+
+unsafe impl Send for Command {}
 
 /// A (connection to a) plugin
 pub struct Plugin {
@@ -119,6 +123,23 @@ impl Plugin {
         try!(self.pull.read_to_string(&mut self.buf));
         let cmd: Command = try!(json::decode(&self.buf));
         Ok(cmd)
+    }
+
+    /// read commands, and give every command to `f`
+    fn listen<F>(mut self, f: F) where F: Fn(Command) + 'static {
+        loop {
+            match self.recv_command() {
+                Err(ref e) => (), // TODO: print error?
+                    Ok(c) => f(c),
+            }
+        }
+    }
+
+    /// Spawn a new thread that listens on the socket
+    pub fn spawn_listen<F>(self, f: F) -> std::thread::JoinHandle<()>
+    where F: Fn(Command) + Sync + Send + 'static
+    {
+        std::thread::spawn(move || { self.listen(f) })
     }
 }
 
