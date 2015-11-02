@@ -1,6 +1,7 @@
 
 extern crate irc;
 extern crate nanomsg;
+extern crate rustc_serialize;
 
 extern crate bender; // interface to plugins
 
@@ -11,11 +12,100 @@ use irc::client::prelude as client;
 use irc::client::server::Server;
 use irc::client::server::utils::ServerExt;
 use std::sync::Arc;
+use std::io::{Read,Write};
+use rustc_serialize::json;
+use nanomsg::{Socket,Protocol,Endpoint};
 
 pub type NetIrcServer = irc::client::server::NetIrcServer;
 pub type Message = irc::client::data::Message;
 
 // TODO: parse config from a file, if asked on the command-line?
+
+/// A connection to a plugin
+pub struct PluginConn {
+    buf: String, // buffer for reading
+    pull: Socket, // Get commands
+    endpoint: Endpoint,
+    path: String, // path of the plugin program
+    subproc: std::process::Output, // the subprocess
+}
+
+impl PluginConn {
+    /// Spawn the plugin at this given
+    pub fn spawn(p: &str) -> Result<PluginConn> {
+        use std::process::Command;
+        let subproc = try!(Command::new(p).output());
+        let mut pull = try!(Socket::new(Protocol::Pull));
+        let endpoint = try!(pull.bind("ipc:///tmp/bender.ipc"));
+        Ok(PluginConn {
+            buf: String::with_capacity(256),
+            pull: pull,
+            endpoint: endpoint,
+            path: p.to_string(),
+            subproc: subproc,
+        })
+    }
+
+    /// Read a command sent by the plugin
+    pub fn recv_command(&mut self) -> Result<Command> {
+        self.buf.clear();
+        try!(self.pull.read_to_string(&mut self.buf));
+        let cmd: Command = try!(json::decode(&self.buf));
+        Ok(cmd)
+    }
+
+    /// read commands, and give every command to `f`
+    fn listen<F>(mut self, f: F) where F: Fn(Command) + 'static {
+        loop {
+            match self.recv_command() {
+                Err(ref e) => (), // TODO: print error?
+                    Ok(c) => f(c),
+            }
+        }
+    }
+
+    /// Spawn a new thread that listens on the socket
+    pub fn spawn_listen<F>(self, f: F) -> std::thread::JoinHandle<()>
+    where F: Fn(Command) + Sync + Send + 'static
+    {
+        std::thread::spawn(move || { self.listen(f) })
+    }
+}
+
+impl Drop for PluginConn {
+    fn drop(&mut self) { self.endpoint.shutdown().unwrap(); }
+}
+
+/// A Set of plugins
+pub struct PluginSet {
+    push: Socket, // broadcast
+    endpoint: Endpoint,
+    plugins: Vec<PluginConn>,
+}
+
+impl PluginSet {
+    /// Create an empty set of plugins.
+    pub fn new() -> Result<PluginSet> {
+        let mut push = try!(Socket::new(Protocol::Push));
+        let endpoint = try!(push.bind("ipc:///tmp/bender.ipc"));
+        Ok(PluginSet {
+            plugins: Vec::new(),
+            push: push,
+            endpoint: endpoint,
+        })
+    }
+
+    /// Transmit an event to the plugin.
+    pub fn send_event(&mut self, msg: Event) -> Result<()> {
+        let json = json::encode(&msg).unwrap();
+        try!(self.push.write(json.as_bytes()));
+        Ok(())
+    }
+}
+
+impl Drop for PluginSet {
+    fn drop(&mut self) { self.endpoint.shutdown().unwrap(); }
+}
 
 /// Create the configuration
 pub fn mk_config() -> client::Config {
@@ -56,7 +146,7 @@ pub fn main_loop() -> Result<()> {
         let msg = try!(msg);
         try!(handle_msg(&conn, &mut plugins, msg));
     }
-    g.join(); // wait for thread
+    g.join().unwrap(); // wait for thread
     Ok(())
 }
 

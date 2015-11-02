@@ -92,86 +92,74 @@ pub enum Command {
 
 unsafe impl Send for Command {}
 
-/// A (connection to a) plugin
-pub struct Plugin {
-    buf: String, // buffer for reading
-    pull: Socket, // Get commands
-    endpoint: Endpoint,
-    path: String, // path of the plugin program
-    subproc: std::process::Output, // the subprocess
+/// Connection to the server.
+///
+/// A plugin might be simply written as
+/// ```
+/// fn plugin() {
+///   let conn = ServerConn::new();
+///   for e in conn {
+///     match e {
+///       Privmsg(from, body) =>
+///         conn.send_command(Privmsg {to: from, body: body }).unwrap(),
+///       _ => (),
+///     }
+///   }
+/// }
+pub struct ServerConn {
+    buf: String,
+    push : Socket,
+    push_endpoint: Endpoint,
+    pull: Socket,
+    pull_endpoint: Endpoint,
 }
 
-impl Plugin {
-    /// Spawn the plugin at this given
-    pub fn spawn(p: &str) -> Result<Plugin> {
-        use std::process::Command;
-        let subproc = try!(Command::new(p).output());
-        let mut pull = try!(Socket::new(Protocol::Pull));
-        let mut endpoint = try!(pull.bind("ipc:///tmp/bender.ipc"));
-        Ok(Plugin {
-            buf: String::with_capacity(256),
-            pull: pull,
-            endpoint: endpoint,
-            path: p.to_string(),
-            subproc: subproc,
-        })
-    }
-
-    /// Read a command sent by the plugin
-    pub fn recv_command(&mut self) -> Result<Command> {
-        self.buf.clear();
-        try!(self.pull.read_to_string(&mut self.buf));
-        let cmd: Command = try!(json::decode(&self.buf));
-        Ok(cmd)
-    }
-
-    /// read commands, and give every command to `f`
-    fn listen<F>(mut self, f: F) where F: Fn(Command) + 'static {
-        loop {
-            match self.recv_command() {
-                Err(ref e) => (), // TODO: print error?
-                    Ok(c) => f(c),
-            }
-        }
-    }
-
-    /// Spawn a new thread that listens on the socket
-    pub fn spawn_listen<F>(self, f: F) -> std::thread::JoinHandle<()>
-    where F: Fn(Command) + Sync + Send + 'static
-    {
-        std::thread::spawn(move || { self.listen(f) })
-    }
-}
-
-/// A Set of plugins
-pub struct PluginSet {
-    push: Socket, // broadcast
-    endpoint: Endpoint,
-    plugins: Vec<Plugin>,
-}
-
-impl PluginSet {
-    /// Create an empty set of plugins.
-    pub fn new() -> Result<PluginSet> {
+impl ServerConn {
+    /// Create a new connection to the server
+    pub fn new() -> Result<ServerConn> {
         let mut push = try!(Socket::new(Protocol::Push));
-        let mut endpoint = try!(push.bind("ipc:///tmp/bender.ipc"));
-        Ok(PluginSet {
-            plugins: Vec::new(),
+        let push_endpoint = try!(push.bind("ipc:///tmp/bender.ipc"));
+        let mut pull = try!(Socket::new(Protocol::Pull));
+        let pull_endpoint = try!(pull.bind("ipc:///tmp/bender.ipc"));
+        Ok(ServerConn {
+            buf: String::with_capacity(256),
             push: push,
-            endpoint: endpoint,
+            push_endpoint: push_endpoint,
+            pull: pull,
+            pull_endpoint: pull_endpoint,
         })
     }
 
-    /// Transmit an event to the plugin.
-    pub fn send_event(&mut self, msg: Event) -> Result<()> {
-        let json = json::encode(&msg).unwrap();
+    /// Send command
+    pub fn send_command(&mut self, c: Command) -> Result<()> {
+        let json = json::encode(&c).unwrap();
         try!(self.push.write(json.as_bytes()));
         Ok(())
     }
+
+    /// Read next event
+    pub fn recv_event(&mut self) -> Result<Event> {
+        self.buf.clear();
+        try!(self.pull.read_to_string(&mut self.buf));
+        let e: Event = try!(json::decode(&self.buf));
+        Ok(e)
+    }
 }
 
-// ## Communication from Bender to Plugin
+impl Iterator for ServerConn {
+    type Item = Event;
 
+    fn next(&mut self) -> Option<Event> {
+        self.recv_event().ok()
+    }
+}
+
+impl Drop for ServerConn {
+    fn drop(&mut self) {
+        self.push_endpoint.shutdown().unwrap(); // cannot return result here
+        self.pull_endpoint.shutdown().unwrap();
+    }
+}
 
 
 
