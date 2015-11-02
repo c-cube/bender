@@ -36,7 +36,7 @@ impl PluginConn {
         use std::process::Command;
         let subproc = try!(Command::new(p).output());
         let mut pull = try!(Socket::new(Protocol::Pull));
-        let endpoint = try!(pull.bind("ipc:///tmp/bender.ipc"));
+        let endpoint = try!(pull.bind("ipc:///tmp/plugin2bender.ipc"));
         Ok(PluginConn {
             buf: String::with_capacity(256),
             pull: pull,
@@ -87,7 +87,7 @@ impl PluginSet {
     /// Create an empty set of plugins.
     pub fn new() -> Result<PluginSet> {
         let mut push = try!(Socket::new(Protocol::Push));
-        let endpoint = try!(push.bind("ipc:///tmp/bender.ipc"));
+        let endpoint = try!(push.bind("ipc:///tmp/bender2plugin.ipc"));
         Ok(PluginSet {
             plugins: Vec::new(),
             push: push,

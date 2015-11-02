@@ -92,51 +92,31 @@ pub enum Command {
 
 unsafe impl Send for Command {}
 
-/// Connection to the server.
-///
-/// A plugin might be simply written as
-/// ```
-/// fn plugin() {
-///   let conn = ServerConn::new();
-///   for e in conn {
-///     match e {
-///       Privmsg(from, body) =>
-///         conn.send_command(Privmsg {to: from, body: body }).unwrap(),
-///       _ => (),
-///     }
-///   }
-/// }
-pub struct ServerConn {
-    buf: String,
+pub struct ServerConnPush {
     push : Socket,
     push_endpoint: Endpoint,
-    pull: Socket,
-    pull_endpoint: Endpoint,
 }
 
-impl ServerConn {
-    /// Create a new connection to the server
-    pub fn new() -> Result<ServerConn> {
-        let mut push = try!(Socket::new(Protocol::Push));
-        let push_endpoint = try!(push.bind("ipc:///tmp/bender.ipc"));
-        let mut pull = try!(Socket::new(Protocol::Pull));
-        let pull_endpoint = try!(pull.bind("ipc:///tmp/bender.ipc"));
-        Ok(ServerConn {
-            buf: String::with_capacity(256),
-            push: push,
-            push_endpoint: push_endpoint,
-            pull: pull,
-            pull_endpoint: pull_endpoint,
-        })
-    }
-
+impl ServerConnPush {
     /// Send command
     pub fn send_command(&mut self, c: Command) -> Result<()> {
         let json = json::encode(&c).unwrap();
         try!(self.push.write(json.as_bytes()));
         Ok(())
     }
+}
 
+impl Drop for ServerConnPush {
+    fn drop(&mut self) { self.push_endpoint.shutdown().unwrap(); }
+}
+
+pub struct ServerConnPull {
+    buf: String,
+    pull: Socket,
+    pull_endpoint: Endpoint,
+}
+
+impl ServerConnPull {
     /// Read next event
     pub fn recv_event(&mut self) -> Result<Event> {
         self.buf.clear();
@@ -146,7 +126,7 @@ impl ServerConn {
     }
 }
 
-impl Iterator for ServerConn {
+impl Iterator for ServerConnPull {
     type Item = Event;
 
     fn next(&mut self) -> Option<Event> {
@@ -154,13 +134,42 @@ impl Iterator for ServerConn {
     }
 }
 
-impl Drop for ServerConn {
+impl Drop for ServerConnPull {
     fn drop(&mut self) {
-        self.push_endpoint.shutdown().unwrap(); // cannot return result here
         self.pull_endpoint.shutdown().unwrap();
     }
 }
 
+/// Connection to the server.
+///
+/// A plugin might be simply written as
+/// ```
+/// fn plugin() {
+///   let (push, pull) = connect_server();
+///   for e in pull {
+///     match e {
+///       Privmsg(from, body) =>
+///         push.send_command(Privmsg {to: from, body: body }).unwrap(),
+///       _ => (),
+///     }
+///   }
+/// }
+/// ```
+pub fn connect_server() -> Result<(ServerConnPush, ServerConnPull)> {
+    let mut push = try!(Socket::new(Protocol::Push));
+    let push_endpoint = try!(push.bind("ipc:///tmp/plugin2bender.ipc"));
+    let mut pull = try!(Socket::new(Protocol::Pull));
+    let pull_endpoint = try!(pull.bind("ipc:///tmp/bender2plugin.ipc"));
+    Ok((ServerConnPush {
+            push: push,
+            push_endpoint: push_endpoint,
+        }, ServerConnPull {
+            buf: String::with_capacity(256),
+            pull: pull,
+            pull_endpoint: pull_endpoint,
+        }
+    ))
+}
 
 
 
