@@ -1,6 +1,6 @@
 
 all:
-	cargo build --release
+	cargo build
 
 test:
 	cargo test
