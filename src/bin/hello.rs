@@ -6,13 +6,16 @@ use bender::*;
 
 fn run() -> Result<()> {
     let (mut push, mut pull) = try!(connect_server());
+    println!("connected");
     for e in pull {
         match e {
-            Event::Privmsg {from, content} =>
+            Event::Privmsg {from, content} => {
+                println!("received privmsg {} from {:?}", content, from);
                 if content.contains("hello") {
                     let c = Command::Privmsg{to:from, content:"world".to_string()};
                     try!(push.send_command(c));
-                },
+                }
+            },
             _ => (),
         }
     };

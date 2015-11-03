@@ -125,18 +125,7 @@ pub fn handle_msg(
     msg: Message
 ) -> Result<()> {
     // TODO
-    let event = match msg.command.as_ref() {
-        "PRIVMSG" => {
-            Event::Privmsg {
-                from: IrcEndPoint::from_string(msg.args[0].clone()),
-                content: msg.suffix.expect("empty private message!!")
-            }
-        },
-        "JOIN" => {
-            Event::Joined { chan: msg.suffix.expect("empty joined message!!") }
-        },
-        _ => return Ok(())
-    };
+    let event = Event::from_message(msg);
     println!("event {:?}", event);
     Ok(())
 }

@@ -1,6 +1,7 @@
 // Interface between the IRC bot, and its plugins
 
 extern crate nanomsg;
+extern crate irc;
 extern crate rustc_serialize;  // serialization into/from JSON
 
 use std::io::{Read,Write};
@@ -9,6 +10,9 @@ use std::vec::Vec;
 use nanomsg::{Socket,Protocol,Endpoint};
 use rustc_serialize::json;
 use rustc_serialize::json::Json;
+use irc::client::data;
+
+pub type IrcMessage = irc::client::data::Message;
 
 /// The Error type for Bender
 #[derive(Debug)]
@@ -97,6 +101,39 @@ impl IrcEndPoint {
 pub enum Event {
     Privmsg {from: IrcEndPoint, content: String},
     Joined {chan: String},
+}
+
+impl Event {
+    pub fn from_message(msg: IrcMessage) -> Option<Self> {
+        match msg {
+            IrcMessage {
+                prefix: Some(prefix),
+                command: command,
+                args: args,
+                suffix: Some(suffix),
+                ..
+            } => {
+                match command.as_ref() {
+                    "PRIVMSG" => {
+                        Some(Event::Privmsg {
+                            // can panic if args is empty, but that should not
+                            // happen in theory
+                            // we might want ot handle this explicitly though
+                            from: IrcEndPoint::from_string(args[0].clone()),
+                            content: suffix
+                        })
+                    },
+                    "JOIN" => {
+                        Some(Event::Joined {
+                            chan: suffix
+                        })
+                    },
+                    _ => None
+                }
+            },
+            _ => None
+        }
+    }
 }
 
 unsafe impl Send for Event {}
