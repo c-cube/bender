@@ -79,8 +79,21 @@ pub enum IrcEndPoint {
     User(String),
 }
 
+impl IrcEndPoint {
+    /// Create an endpoint by parsing a string
+    /// channels are identified by the leading #
+    pub fn from_string(irc_arg: String) -> IrcEndPoint {
+        if irc_arg.starts_with("#") {
+            IrcEndPoint::Chan(irc_arg)
+        }
+        else {
+            IrcEndPoint::User(irc_arg)
+        }
+    }
+}
+
 /// An event witnessed by Bender, transmitted to the plugins
-#[derive(RustcDecodable, RustcEncodable,Clone)]
+#[derive(RustcDecodable, RustcEncodable, Debug, Clone)]
 pub enum Event {
     Privmsg {from: IrcEndPoint, content: String},
     Joined {chan: String},
