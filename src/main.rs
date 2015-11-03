@@ -109,12 +109,13 @@ impl Drop for PluginSet {
 
 /// Create the configuration
 pub fn mk_config() -> client::Config {
-    let mut c: client::Config = Default::default();
-    c.nickname = Some("bender".to_string());
-    c.realname = Some("bender".to_string());
-    c.use_ssl = Some(true);
-    c.server = Some("irc.rezosup.net".to_string());
-    c
+    client::Config {
+        nickname: Some("bender".to_string()),
+        realname: Some("bender".to_string()),
+        use_ssl: Some(true),
+        server: Some("irc.rezosup.net".to_string()),
+        .. Default::default()
+    }
 }
 
 /// Handle a received message, dispatching it to plugins
