@@ -109,14 +109,14 @@ impl Event {
             IrcMessage {
                 prefix: Some(prefix),
                 command: command,
-                args: args,
+                args: mut args,
                 suffix: Some(suffix),
                 ..
             } => {
                 match command.as_ref() {
                     "PRIVMSG" if args.len() > 0 => {
                         Some(Event::Privmsg {
-                            from: IrcEndPoint::from_string(args[0].clone()),
+                            from: IrcEndPoint::from_string(args.swap_remove(0)),
                             content: suffix
                         })
                     },
