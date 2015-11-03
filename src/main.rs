@@ -125,8 +125,9 @@ pub fn handle_msg(
     msg: Message
 ) -> Result<()> {
     // TODO
-    let event = Event::from_message(msg);
-    println!("event {:?}", event);
+    if let Some(event) = Event::from_message(msg) {
+        println!("event {:?}", event);
+    }
     Ok(())
 }
 

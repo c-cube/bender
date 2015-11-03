@@ -114,11 +114,8 @@ impl Event {
                 ..
             } => {
                 match command.as_ref() {
-                    "PRIVMSG" => {
+                    "PRIVMSG" if args.len() > 0 => {
                         Some(Event::Privmsg {
-                            // can panic if args is empty, but that should not
-                            // happen in theory
-                            // we might want ot handle this explicitly though
                             from: IrcEndPoint::from_string(args[0].clone()),
                             content: suffix
                         })
