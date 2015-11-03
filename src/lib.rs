@@ -71,10 +71,18 @@ impl std::error::Error for Error {
 /// `Result`, specialized for `bender::Error`.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// An irc endpoint is either a user or a channel,
+/// it can be the source of messages, or the sink of messages
+#[derive(RustcDecodable, RustcEncodable, Clone, Debug)]
+pub enum IrcEndPoint {
+    Chan(String),
+    User(String),
+}
+
 /// An event witnessed by Bender, transmitted to the plugins
 #[derive(RustcDecodable, RustcEncodable,Clone)]
 pub enum Event {
-    Privmsg {from: String, content: String},
+    Privmsg {from: IrcEndPoint, content: String},
     Joined {chan: String},
 }
 
@@ -83,7 +91,7 @@ unsafe impl Send for Event {}
 /// A command sent by a plugin, to Bender
 #[derive(RustcDecodable, RustcEncodable,Clone,Debug)]
 pub enum Command {
-    Privmsg {to: String, content: String}, // send a message
+    Privmsg {to: IrcEndPoint, content: String}, // send a message
     Join {chan: String},  // join channel
     Part {chan: String},  // quit chan
     Reconnect, // reconnect to IRC
