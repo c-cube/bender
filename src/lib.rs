@@ -172,6 +172,7 @@ impl ServerConnPush {
         let json = json::encode(&c).unwrap();
         try!(self.push.write(json.as_bytes()));
         try!(self.push.flush());
+        println!("sent command");
         Ok(())
     }
 }

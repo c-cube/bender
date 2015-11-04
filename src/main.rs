@@ -150,7 +150,6 @@ pub fn mk_config() -> client::Config {
 
 /// Handle a received message, dispatching it to plugins
 pub fn handle_msg(
-    conn: &NetIrcServer,
     plugins: &mut PluginSet,
     msg: Message
 ) -> Result<()> {
@@ -180,7 +179,7 @@ pub fn main_loop() -> Result<()> {
     let mut plugins = try!(PluginSet::new());
     for msg in conn.iter() {
         let msg = try!(msg);
-        try!(handle_msg(&conn, &mut plugins, msg));
+        try!(handle_msg(&mut plugins, msg));
     }
     // listen for commands from plugins
     let g_listen = plugins.pull.spawn_listen(move |c:Command| {
