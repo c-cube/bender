@@ -98,7 +98,9 @@ impl PluginSet {
     /// Transmit an event to the plugin.
     pub fn send_event(&mut self, msg: Event) -> Result<()> {
         let json = json::encode(&msg).unwrap();
+        println!("sending event {:?}", msg);
         try!(self.push.write(json.as_bytes()));
+        println!("sent event");
         Ok(())
     }
 }
@@ -126,7 +128,7 @@ pub fn handle_msg(
 ) -> Result<()> {
     // TODO
     match Event::from_message(msg) {
-        Ok(event) => println!("event {:?}", event),
+        Ok(event) => try!(plugins.send_event(event)),
         Err(msg) => println!("unhandled message {:?}", msg)
     }
     Ok(())

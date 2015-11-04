@@ -5,9 +5,10 @@ extern crate bender;
 use bender::*;
 
 fn run() -> Result<()> {
-    let (mut push, mut pull) = try!(connect_server());
+    let (mut push, pull) = try!(connect_server());
     println!("connected");
     for e in pull {
+        println!("something received by hello");
         match e {
             Event::Privmsg {from, content} => {
                 println!("received privmsg {} from {:?}", content, from);
