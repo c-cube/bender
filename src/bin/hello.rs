@@ -15,7 +15,7 @@ fn run() -> Result<()> {
                 if content.contains("hello") {
                     let c = Command::Privmsg{
                         to:from,
-                        content:"world".to_string()
+                        content:"world!".to_string()
                     };
                     try!(push.send_command(c));
                 }

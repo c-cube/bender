@@ -80,6 +80,15 @@ pub enum IrcEndPoint {
 }
 
 impl IrcEndPoint {
+    pub fn as_str<'a>(&'a self) -> &'a str {
+        match *self {
+            IrcEndPoint::Chan(ref s) => s,
+            IrcEndPoint::User(ref s) => s,
+        }
+    }
+}
+
+impl IrcEndPoint {
     /// Create an endpoint by parsing a string
     /// channels are identified by the leading #
     pub fn from_string(irc_arg: String) -> IrcEndPoint {

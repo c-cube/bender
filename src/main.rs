@@ -23,9 +23,6 @@ pub type Message = irc::client::data::Message;
 
 /// A connection to a plugin
 pub struct PluginConn {
-    buf: String, // buffer for reading
-    pull: Socket, // Get commands
-    endpoint: Endpoint,
     path: String, // path of the plugin program
     subproc: std::process::Output, // the subprocess
 }
@@ -35,18 +32,31 @@ impl PluginConn {
     pub fn spawn(p: &str) -> Result<PluginConn> {
         use std::process::Command;
         let subproc = try!(Command::new(p).output());
-        let mut pull = try!(Socket::new(Protocol::Pull));
-        let endpoint = try!(pull.bind("ipc:///tmp/plugin2bender.ipc"));
         Ok(PluginConn {
-            buf: String::with_capacity(256),
-            pull: pull,
-            endpoint: endpoint,
             path: p.to_string(),
             subproc: subproc,
         })
     }
+}
 
-    /// Read a command sent by the plugin
+pub struct PluginSetPull {
+    buf: String, // buffer for reading
+    pull: Socket, // Get commands
+    endpoint: Endpoint,
+}
+
+impl PluginSetPull {
+    fn new() -> Result<PluginSetPull> {
+        let mut pull = try!(Socket::new(Protocol::Pull));
+        let endpoint = try!(pull.bind("ipc:///tmp/plugin2bender.ipc"));
+        Ok(PluginSetPull {
+            buf: String::with_capacity(256),
+            pull: pull,
+            endpoint: endpoint,
+        })
+    }
+
+    /// Read a command sent by some plugin
     pub fn recv_command(&mut self) -> Result<Command> {
         self.buf.clear();
         try!(self.pull.read_to_string(&mut self.buf));
@@ -59,7 +69,7 @@ impl PluginConn {
         loop {
             match self.recv_command() {
                 Err(ref e) => (), // TODO: print error?
-                    Ok(c) => f(c),
+                Ok(c) => f(c),
             }
         }
     }
@@ -72,24 +82,21 @@ impl PluginConn {
     }
 }
 
-impl Drop for PluginConn {
+impl Drop for PluginSetPull {
     fn drop(&mut self) { self.endpoint.shutdown().unwrap(); }
 }
 
-/// A Set of plugins
-pub struct PluginSet {
+pub struct PluginSetPush {
     push: Socket, // broadcast
     endpoint: Endpoint,
-    plugins: Vec<PluginConn>,
 }
 
-impl PluginSet {
+impl PluginSetPush {
     /// Create an empty set of plugins.
-    pub fn new() -> Result<PluginSet> {
+    pub fn new() -> Result<PluginSetPush> {
         let mut push = try!(Socket::new(Protocol::Pub));
         let endpoint = try!(push.bind("ipc:///tmp/bender2plugin.ipc"));
-        Ok(PluginSet {
-            plugins: Vec::new(),
+        Ok(PluginSetPush {
             push: push,
             endpoint: endpoint,
         })
@@ -106,8 +113,28 @@ impl PluginSet {
     }
 }
 
-impl Drop for PluginSet {
+impl Drop for PluginSetPush {
     fn drop(&mut self) { self.endpoint.shutdown().unwrap(); }
+}
+
+/// A Set of plugins
+pub struct PluginSet {
+    plugins: Vec<PluginConn>,
+    push: PluginSetPush,
+    pull: PluginSetPull,
+}
+
+impl PluginSet {
+    /// Create an empty set of plugins.
+    pub fn new() -> Result<PluginSet> {
+        let mut push = try!(PluginSetPush::new());
+        let mut pull = try!(PluginSetPull::new());
+        Ok(PluginSet {
+            plugins: Vec::new(),
+            push: push,
+            pull: pull,
+        })
+    }
 }
 
 /// Create the configuration
@@ -129,7 +156,7 @@ pub fn handle_msg(
 ) -> Result<()> {
     // TODO
     match Event::from_message(msg) {
-        Ok(event) => try!(plugins.send_event(event)),
+        Ok(event) => try!(plugins.push.send_event(event)),
         Err(msg) => println!("unhandled message {:?}", msg)
     }
     Ok(())
@@ -149,12 +176,23 @@ pub fn main_loop() -> Result<()> {
             conn2.send_join("#sac").unwrap();
         })
     };
+    let conn3 = conn.clone();
     let mut plugins = try!(PluginSet::new());
     for msg in conn.iter() {
         let msg = try!(msg);
         try!(handle_msg(&conn, &mut plugins, msg));
     }
+    // listen for commands from plugins
+    let g_listen = plugins.pull.spawn_listen(move |c:Command| {
+        println!("bender: received command {:?}", c);
+        match c {
+            Command::Privmsg {to, content} =>
+                conn3.send_privmsg(to.as_str(), &content).unwrap(),
+            _ => (), // TODO
+        }
+    });
     g.join().unwrap(); // wait for thread
+    g_listen.join().unwrap();
     Ok(())
 }
 
