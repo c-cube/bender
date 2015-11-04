@@ -100,31 +100,37 @@ pub enum Event {
 }
 
 impl Event {
-    pub fn from_message(msg: IrcMessage) -> Option<Self> {
+    pub fn from_message(msg: IrcMessage) -> std::result::Result<Self, IrcMessage> {
         match msg {
             IrcMessage {
+                tags,
                 prefix: Some(prefix),
                 command,
                 mut args,
                 suffix: Some(suffix),
-                ..
             } => {
                 match command.as_ref() {
                     "PRIVMSG" if args.len() > 0 => {
-                        Some(Event::Privmsg {
+                        Ok(Event::Privmsg {
                             from: IrcEndPoint::from_string(args.swap_remove(0)),
                             content: suffix
                         })
                     },
                     "JOIN" => {
-                        Some(Event::Joined {
+                        Ok(Event::Joined {
                             chan: suffix
                         })
                     },
-                    _ => None
+                    _ => Err(IrcMessage {
+                        tags: tags,
+                        prefix: Some(prefix),
+                        command: command,
+                        args: args,
+                        suffix: Some(suffix)
+                    })
                 }
             },
-            _ => None
+            _ => Err(msg)
         }
     }
 }
