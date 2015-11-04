@@ -5,12 +5,8 @@ extern crate irc;
 extern crate rustc_serialize;  // serialization into/from JSON
 
 use std::io::{Read,Write};
-use std::sync::Arc;
-use std::vec::Vec;
 use nanomsg::{Socket,Protocol,Endpoint};
 use rustc_serialize::json;
-use rustc_serialize::json::Json;
-use irc::client::data;
 
 pub type IrcMessage = irc::client::data::Message;
 
@@ -108,8 +104,8 @@ impl Event {
         match msg {
             IrcMessage {
                 prefix: Some(prefix),
-                command: command,
-                args: mut args,
+                command,
+                mut args,
                 suffix: Some(suffix),
                 ..
             } => {
