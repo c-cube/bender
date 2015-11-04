@@ -13,7 +13,10 @@ fn run() -> Result<()> {
             Event::Privmsg {from, content} => {
                 println!("received privmsg {} from {:?}", content, from);
                 if content.contains("hello") {
-                    let c = Command::Privmsg{to:from, content:"world".to_string()};
+                    let c = Command::Privmsg{
+                        to:from,
+                        content:"world".to_string()
+                    };
                     try!(push.send_command(c));
                 }
             },

@@ -100,7 +100,9 @@ pub enum Event {
 }
 
 impl Event {
-    pub fn from_message(msg: IrcMessage) -> std::result::Result<Self, IrcMessage> {
+    pub fn from_message(msg: IrcMessage)
+    -> std::result::Result<Self, IrcMessage>
+    {
         match msg {
             IrcMessage {
                 tags,
@@ -157,8 +159,10 @@ pub struct ServerConnPush {
 impl ServerConnPush {
     /// Send command
     pub fn send_command(&mut self, c: Command) -> Result<()> {
+        println!("send command {:?}", c);
         let json = json::encode(&c).unwrap();
         try!(self.push.write(json.as_bytes()));
+        try!(self.push.flush());
         Ok(())
     }
 }
@@ -214,9 +218,10 @@ impl Drop for ServerConnPull {
 /// ```
 pub fn connect_server() -> Result<(ServerConnPush, ServerConnPull)> {
     let mut push = try!(Socket::new(Protocol::Push));
-    let push_endpoint = try!(push.bind("ipc:///tmp/plugin2bender.ipc"));
-    let mut pull = try!(Socket::new(Protocol::Pull));
-    let pull_endpoint = try!(pull.bind("ipc:///tmp/bender2plugin.ipc"));
+    let push_endpoint = try!(push.connect("ipc:///tmp/plugin2bender.ipc"));
+    let mut pull = try!(Socket::new(Protocol::Sub));
+    let pull_endpoint = try!(pull.connect("ipc:///tmp/bender2plugin.ipc"));
+    try!(pull.subscribe(""));
     Ok((ServerConnPush {
             push: push,
             push_endpoint: push_endpoint,

@@ -86,7 +86,7 @@ pub struct PluginSet {
 impl PluginSet {
     /// Create an empty set of plugins.
     pub fn new() -> Result<PluginSet> {
-        let mut push = try!(Socket::new(Protocol::Push));
+        let mut push = try!(Socket::new(Protocol::Pub));
         let endpoint = try!(push.bind("ipc:///tmp/bender2plugin.ipc"));
         Ok(PluginSet {
             plugins: Vec::new(),
@@ -100,6 +100,7 @@ impl PluginSet {
         let json = json::encode(&msg).unwrap();
         println!("sending event {:?}", msg);
         try!(self.push.write(json.as_bytes()));
+        try!(self.push.flush());
         println!("sent event");
         Ok(())
     }
