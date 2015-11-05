@@ -90,14 +90,22 @@ impl IrcEndPoint {
 
     /// Create an endpoint by parsing a string
     /// channels are identified by the leading #
+    /// 
+    /// # Panics
+    ///
+    /// On private messages, if the prefix string does not contain
+    /// a '!' to identify the user name, or if the '!' is in first position.
     pub fn from_strings(irc_arg: String, prefix: String) -> IrcEndPoint {
         if irc_arg.starts_with("#") {
             IrcEndPoint::Chan(irc_arg)
         }
         else {
-            let from_user = prefix.split("!").next()
-                                  .expect("privmsg prefixes should contain !")
-                                  .to_string();
+            let bang_loc = prefix.find("!")
+                                 .expect("Privmsg prefix should contain !");
+            let mut prefix = prefix;
+            assert!(bang_loc > 0, "'!' should not be on first pos");
+            prefix.truncate(bang_loc - 1);
+            let from_user = prefix;
             IrcEndPoint::User(from_user)
         }
     }
