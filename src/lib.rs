@@ -130,7 +130,6 @@ impl Event {
                 mut args,
                 suffix: Some(suffix),
             } => {
-                println!("prefix: {:?}", prefix);
                 match command.as_ref() {
                     "PRIVMSG" if args.len() > 0 => {
                         let arg0 = args.swap_remove(0);
