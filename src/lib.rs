@@ -104,7 +104,7 @@ impl IrcEndPoint {
                                  .expect("Privmsg prefix should contain !");
             let mut prefix = prefix;
             assert!(bang_loc > 0, "'!' should not be on first pos");
-            prefix.truncate(bang_loc - 1);
+            prefix.truncate(bang_loc);
             let from_user = prefix;
             IrcEndPoint::User(from_user)
         }
