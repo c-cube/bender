@@ -68,7 +68,7 @@ impl PluginSetPull {
     fn listen<F>(mut self, f: F) where F: Fn(Command) + 'static {
         loop {
             match self.recv_command() {
-                Err(ref e) => (), // TODO: print error?
+                Err(ref e) => println!("error on command: {:?}", e),
                 Ok(c) => f(c),
             }
         }
@@ -121,19 +121,17 @@ impl Drop for PluginSetPush {
 pub struct PluginSet {
     plugins: Vec<PluginConn>,
     push: PluginSetPush,
-    pull: PluginSetPull,
 }
 
 impl PluginSet {
     /// Create an empty set of plugins.
-    pub fn new() -> Result<PluginSet> {
-        let mut push = try!(PluginSetPush::new());
-        let mut pull = try!(PluginSetPull::new());
-        Ok(PluginSet {
+    pub fn new() -> Result<(PluginSet, PluginSetPull)> {
+        let push = try!(PluginSetPush::new());
+        let pull = try!(PluginSetPull::new());
+        Ok((PluginSet {
             plugins: Vec::new(),
             push: push,
-            pull: pull,
-        })
+        }, pull))
     }
 }
 
@@ -175,14 +173,12 @@ pub fn main_loop() -> Result<()> {
             conn2.send_join("#sac").unwrap();
         })
     };
+
     let conn3 = conn.clone();
-    let mut plugins = try!(PluginSet::new());
-    for msg in conn.iter() {
-        let msg = try!(msg);
-        try!(handle_msg(&mut plugins, msg));
-    }
+    let (mut plugins, mut pull) = try!(PluginSet::new());
+
     // listen for commands from plugins
-    let g_listen = plugins.pull.spawn_listen(move |c:Command| {
+    let g_listen = pull.spawn_listen(move |c:Command| {
         println!("bender: received command {:?}", c);
         match c {
             Command::Privmsg {to, content} =>
@@ -190,6 +186,11 @@ pub fn main_loop() -> Result<()> {
             _ => (), // TODO
         }
     });
+
+    for msg in conn.iter() {
+        let msg = try!(msg);
+        try!(handle_msg(&mut plugins, msg));
+    }
     g.join().unwrap(); // wait for thread
     g_listen.join().unwrap();
     Ok(())
