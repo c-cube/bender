@@ -90,12 +90,15 @@ impl IrcEndPoint {
 
     /// Create an endpoint by parsing a string
     /// channels are identified by the leading #
-    pub fn from_string(irc_arg: String) -> IrcEndPoint {
+    pub fn from_strings(irc_arg: String, prefix: String) -> IrcEndPoint {
         if irc_arg.starts_with("#") {
             IrcEndPoint::Chan(irc_arg)
         }
         else {
-            IrcEndPoint::User(irc_arg)
+            let from_user = prefix.split("!").next()
+                                  .expect("privmsg prefixes should contain !")
+                                  .to_string();
+            IrcEndPoint::User(from_user)
         }
     }
 }
@@ -119,10 +122,12 @@ impl Event {
                 mut args,
                 suffix: Some(suffix),
             } => {
+                println!("prefix: {:?}", prefix);
                 match command.as_ref() {
                     "PRIVMSG" if args.len() > 0 => {
+                        let arg0 = args.swap_remove(0);
                         Ok(Event::Privmsg {
-                            from: IrcEndPoint::from_string(args.swap_remove(0)),
+                            from: IrcEndPoint::from_strings(arg0, prefix),
                             content: suffix
                         })
                     },
