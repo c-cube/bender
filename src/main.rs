@@ -8,6 +8,7 @@ extern crate bender; // interface to plugins
 use bender::*;
 
 use std::default::Default;
+use std::path::{Path, PathBuf};
 use irc::client::prelude as client;
 use irc::client::server::Server;
 use irc::client::server::utils::ServerExt;
@@ -23,17 +24,17 @@ pub type Message = irc::client::data::Message;
 
 /// A connection to a plugin
 pub struct PluginConn {
-    path: String, // path of the plugin program
-    subproc: std::process::Output, // the subprocess
+    path: PathBuf, // path of the plugin program
+    subproc: std::process::Child, // the subprocess
 }
 
 impl PluginConn {
     /// Spawn the plugin at this given
-    pub fn spawn(p: &str) -> Result<PluginConn> {
+    pub fn spawn(p: &Path) -> Result<PluginConn> {
         use std::process::Command;
-        let subproc = try!(Command::new(p).output());
+        let subproc = try!(Command::new(p).spawn());
         Ok(PluginConn {
-            path: p.to_string(),
+            path: p.to_path_buf(),
             subproc: subproc,
         })
     }
@@ -133,6 +134,15 @@ impl PluginSet {
             push: push,
         }, pull))
     }
+
+    /// Start the plugin at path and add it to
+    /// the set of monitored plugins
+    pub fn start<P: AsRef<Path>>(&mut self, p: P) -> Result<()> {
+        let p = p.as_ref();
+        let plugin_conn = try!(PluginConn::spawn(p));
+        self.plugins.push(plugin_conn);
+        Ok(())
+    }
 }
 
 /// Create the configuration
@@ -175,7 +185,10 @@ pub fn main_loop() -> Result<()> {
     };
 
     let conn3 = conn.clone();
-    let (mut plugins, mut pull) = try!(PluginSet::new());
+    let (mut plugins, pull) = try!(PluginSet::new());
+
+    // FIXME should get paths from arguments
+    try!(plugins.start("./target/debug/hello"));
 
     // listen for commands from plugins
     let g_listen = pull.spawn_listen(move |c:Command| {
