@@ -75,37 +75,46 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// it can be the source of messages, or the sink of messages
 #[derive(RustcDecodable, RustcEncodable, Clone, Debug)]
 pub enum IrcEndPoint {
-    Chan(String),
+    /// Message on a channel, the user String can be anything when
+    /// used for sending
+    Chan {
+        /// name of the channel
+        name: String,
+        /// user who sent the message (for incoming messages)
+        user: String
+    },
+    /// Message on user query
     User(String),
 }
 
 impl IrcEndPoint {
-    /// str representation of self
+    /// Get the str representation of self that can be used
+    /// for sending replies
     pub fn as_str(& self) -> &str {
         match *self {
-            IrcEndPoint::Chan(ref s) => s,
+            IrcEndPoint::Chan { name: ref s, .. } => s,
             IrcEndPoint::User(ref s) => s,
         }
     }
 
     /// Create an endpoint by parsing a string
     /// channels are identified by the leading #
-    /// 
+    ///
     /// # Panics
     ///
-    /// On private messages, if the prefix string does not contain
-    /// a '!' to identify the user name, or if the '!' is in first position.
+    /// If the prefix string does not contain a '!' to identify the user name,
+    /// or if the '!' is in first position.
     pub fn from_strings(irc_arg: String, prefix: String) -> IrcEndPoint {
+        let bang_loc = prefix.find("!")
+                             .expect("Privmsg prefix should contain !");
+        let mut prefix = prefix;
+        assert!(bang_loc > 0, "'!' should not be on first pos");
+        prefix.truncate(bang_loc);
+        let from_user = prefix;
         if irc_arg.starts_with("#") {
-            IrcEndPoint::Chan(irc_arg)
+            IrcEndPoint::Chan { name: irc_arg, user: from_user }
         }
         else {
-            let bang_loc = prefix.find("!")
-                                 .expect("Privmsg prefix should contain !");
-            let mut prefix = prefix;
-            assert!(bang_loc > 0, "'!' should not be on first pos");
-            prefix.truncate(bang_loc);
-            let from_user = prefix;
             IrcEndPoint::User(from_user)
         }
     }

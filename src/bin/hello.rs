@@ -11,8 +11,16 @@ fn run() -> Result<()> {
     for e in pull {
         match e {
             Event::Privmsg {from, content} => {
-                println!("plugin `hello`: received privmsg {} from {:?}",
-                         content, from);
+                match from {
+                    IrcEndPoint::Chan { ref name, ref user } => {
+                        println!("plugin `hello` received privmsg {} on chan {} by user {}",
+                                 content, name, user);
+                    },
+                    IrcEndPoint::User(ref name) => {
+                        println!("plugin `hello` received privmsg {} by user {}",
+                                 content, name);
+                    }
+                }
                 if content.contains("hello") {
                     let c = Command::Privmsg{
                         to: from,
