@@ -2,6 +2,7 @@
 extern crate irc;
 extern crate nanomsg;
 extern crate rustc_serialize;
+extern crate clap;
 
 extern crate bender; // interface to plugins
 
@@ -170,8 +171,13 @@ pub fn handle_msg(
 }
 
 /// Main listening loop
-pub fn main_loop() -> Result<()> {
-    let c = mk_config();
+pub fn main_loop(conf: Option<&str>,
+                 plugin_path: Option<&str>)
+                 -> Result<()> {
+    let c = match conf {
+        None => mk_config(),
+        Some(_) => unimplemented!()
+    };
     let conn = Arc::new(try!(client::IrcServer::from_config(c)));
     try!(conn.identify());
     // spawn thread to join chan after 2s
@@ -179,6 +185,8 @@ pub fn main_loop() -> Result<()> {
         let conn2 = conn.clone();
         std::thread::spawn(move || {
             std::thread::sleep_ms(2000);
+            // FIXME: looks like on some conditions we don't sleep long
+            // enough and are unable to join the channel, but hard to reproduce
             println!("join #sac");
             conn2.send_join("#sac").unwrap();
         })
@@ -187,8 +195,9 @@ pub fn main_loop() -> Result<()> {
     let conn3 = conn.clone();
     let (mut plugins, pull) = try!(PluginSet::new());
 
-    // FIXME should get paths from arguments
-    try!(plugins.start("./target/debug/hello"));
+    if let Some(path) = plugin_path {
+        try!(plugins.start(&path));
+    }
 
     // listen for commands from plugins
     let g_listen = pull.spawn_listen(move |c:Command| {
@@ -210,7 +219,17 @@ pub fn main_loop() -> Result<()> {
 }
 
 fn main() {
-    main_loop().unwrap_or_else(|e| {
+    let matches = clap::App::new("bender")
+        .version("0.1")
+        .author("<simon.cruanes@m4x.org> and <shuba@melix.net>")
+        .about("irc bot multiplexer")
+        .args_from_usage(
+            "-r --run-plugin=[RUN_PLUGIN] 'Launch the specified plugin'
+             -c --config=[CONFIG] 'Path to the configuration file'")
+        .get_matches();
+
+    main_loop(matches.value_of("CONFIG"),
+              matches.value_of("RUN_PLUGIN")).unwrap_or_else(|e| {
         println!("error: {}", e);
         std::process::exit(1);
     });
