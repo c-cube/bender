@@ -5,6 +5,9 @@ extern crate irc;
 extern crate rustc_serialize;  // serialization into/from JSON
 
 use std::io::{Read,Write};
+use std::path::Path;
+use std::os::unix::fs::PermissionsExt;
+use std::fs;
 use nanomsg::{Socket,Protocol,Endpoint};
 use rustc_serialize::json;
 
@@ -229,6 +232,14 @@ impl Drop for ServerConnPull {
     fn drop(&mut self) {
         self.pull_endpoint.shutdown().unwrap();
     }
+}
+
+pub fn set_777<P: AsRef<Path>>(p: P) -> Result<()> {
+    let metadata = try!(fs::metadata(p.as_ref()));
+    let mut perms = metadata.permissions();
+    perms.set_mode(0o777);
+    try!(fs::set_permissions(p.as_ref(), perms));
+    Ok(())
 }
 
 /// Connection to the server.

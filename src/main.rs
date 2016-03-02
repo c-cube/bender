@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 use irc::client::prelude as client;
 use irc::client::server::Server;
 use irc::client::server::utils::ServerExt;
+use std::time::Duration;
 use std::sync::Arc;
 use std::io::{Read,Write};
 use rustc_serialize::json;
@@ -50,7 +51,9 @@ pub struct PluginSetPull {
 impl PluginSetPull {
     fn new() -> Result<PluginSetPull> {
         let mut pull = try!(Socket::new(Protocol::Pull));
-        let endpoint = try!(pull.bind("ipc:///tmp/plugin2bender.ipc"));
+        let p2b = "ipc:///tmp/plugin2bender.ipc";
+        let endpoint = try!(pull.bind(p2b));
+        try!(set_777(&p2b[6..]));
         Ok(PluginSetPull {
             buf: String::with_capacity(256),
             pull: pull,
@@ -97,7 +100,9 @@ impl PluginSetPush {
     /// Create an empty set of plugins.
     pub fn new() -> Result<PluginSetPush> {
         let mut push = try!(Socket::new(Protocol::Pub));
-        let endpoint = try!(push.bind("ipc:///tmp/bender2plugin.ipc"));
+        let b2p = "ipc:///tmp/bender2plugin.ipc";
+        let endpoint = try!(push.bind(b2p));
+        try!(set_777(&b2p[6..]));
         Ok(PluginSetPush {
             push: push,
             endpoint: endpoint,
