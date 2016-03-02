@@ -189,7 +189,7 @@ pub fn main_loop(conf: Option<&str>,
     let g = {
         let conn2 = conn.clone();
         std::thread::spawn(move || {
-            std::thread::sleep_ms(2000);
+            std::thread::sleep(Duration::new(2, 0));
             // FIXME: looks like on some conditions we don't sleep long
             // enough and are unable to join the channel, but hard to reproduce
             println!("join #sac");

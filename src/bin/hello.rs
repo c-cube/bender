@@ -37,7 +37,7 @@ fn run() -> Result<()> {
 
 /// Run and listen for events
 fn main() {
-    std::thread::sleep_ms(1000);
+    std::thread::sleep(std::time::Duration::new(1, 0));
     match run() {
         Ok(()) => (),
         Err(ref e) => {
