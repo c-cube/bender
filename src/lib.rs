@@ -155,6 +155,9 @@ impl Event {
                             chan: suffix
                         })
                     },
+                    "ERROR" if suffix.starts_with("Closing link") => {
+                        panic!("server disconnected us");
+                    },
                     _ => Err(IrcMessage {
                         tags: tags,
                         prefix: Some(prefix),
