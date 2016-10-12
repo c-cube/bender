@@ -2,7 +2,7 @@
 name = "bender"
 version = "0.1.0"
 authors = ["Simon Cruanes <simon.cruanes.2007@m4x.org>",
-           "Vincent Barrielle <vincent.barrielle@gmail.com>"]
+           "Vincent Barrielle <vincent.barrielle@m4x.org>"]
 
 [dependencies]
 
