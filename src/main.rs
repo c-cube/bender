@@ -80,7 +80,7 @@ impl PluginSetPull {
 
     /// Spawn a new thread that listens on the socket
     pub fn spawn_listen<F>(self, f: F) -> std::thread::JoinHandle<()>
-    where F: Fn(Command) + Sync + Send + 'static
+    where F: Fn(Command) + Send + 'static
     {
         std::thread::spawn(move || { self.listen(f) })
     }
@@ -182,7 +182,7 @@ pub fn main_loop(conf: Option<&str>,
         None => mk_config(),
         Some(_) => unimplemented!()
     };
-    let conn = Arc::new(try!(client::IrcServer::from_config(c)));
+    let conn = try!(client::IrcServer::from_config(c));
     try!(conn.identify());
     // spawn thread to join chan after 2s
     let g = {
