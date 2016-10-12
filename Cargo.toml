@@ -1,11 +1,12 @@
 [package]
 name = "bender"
 version = "0.1.0"
-authors = ["Simon Cruanes <simon.cruanes.2007@m4x.org>"]
+authors = ["Simon Cruanes <simon.cruanes.2007@m4x.org>",
+           "Vincent Barrielle <vincent.barrielle@gmail.com>"]
 
 [dependencies]
 
-irc = "0.9.1"
+irc = "^0.11"
 nanomsg = "^0.4.0"
-rustc-serialize = "0.3"
+rustc-serialize = "^0.3"
 clap = "1.5.3"
