@@ -19,7 +19,6 @@ use std::io::{Read,Write};
 use rustc_serialize::json;
 use nanomsg::{Socket,Protocol,Endpoint};
 
-pub type NetIrcServer = irc::client::server::NetIrcServer;
 pub type Message = irc::client::data::Message;
 
 // TODO: parse config from a file, if asked on the command-line?

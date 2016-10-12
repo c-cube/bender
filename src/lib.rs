@@ -12,6 +12,7 @@ use nanomsg::{Socket,Protocol,Endpoint};
 use rustc_serialize::json;
 
 pub type IrcMessage = irc::client::data::Message;
+use irc::client::data::Command as IrcCmd;
 
 /// The Error type for Bender
 #[derive(Debug)]
@@ -107,15 +108,15 @@ impl IrcEndPoint {
     ///
     /// If the prefix string does not contain a '!' to identify the user name,
     /// or if the '!' is in first position.
-    pub fn from_strings(irc_arg: String, prefix: String) -> IrcEndPoint {
+    pub fn from_strings(msgtarget: String, prefix: String) -> IrcEndPoint {
         let bang_loc = prefix.find("!")
                              .expect("Privmsg prefix should contain !");
         let mut prefix = prefix;
         assert!(bang_loc > 0, "'!' should not be on first pos");
         prefix.truncate(bang_loc);
         let from_user = prefix;
-        if irc_arg.starts_with("#") {
-            IrcEndPoint::Chan { name: irc_arg, user: from_user }
+        if msgtarget.starts_with("#") {
+            IrcEndPoint::Chan { name: msgtarget, user: from_user }
         }
         else {
             IrcEndPoint::User(from_user)
@@ -134,36 +135,32 @@ impl Event {
     pub fn from_message(msg: IrcMessage)
     -> std::result::Result<Self, IrcMessage>
     {
+        println!("msg: {}", msg);
         match msg {
             IrcMessage {
                 tags,
                 prefix: Some(prefix),
                 command,
-                mut args,
-                suffix: Some(suffix),
             } => {
-                match command.as_ref() {
-                    "PRIVMSG" if args.len() > 0 => {
-                        let arg0 = args.swap_remove(0);
+                match command {
+                    IrcCmd::PRIVMSG(msgtarget, msg) => {
                         Ok(Event::Privmsg {
-                            from: IrcEndPoint::from_strings(arg0, prefix),
-                            content: suffix
+                            from: IrcEndPoint::from_strings(msgtarget, prefix),
+                            content: msg
                         })
                     },
-                    "JOIN" => {
+                    IrcCmd::JOIN(chan, _, _) => {
                         Ok(Event::Joined {
-                            chan: suffix
+                            chan: chan
                         })
                     },
-                    "ERROR" if suffix.starts_with("Closing link") => {
+                    IrcCmd::ERROR(ref msg) if msg.starts_with("Closing link") => {
                         panic!("server disconnected us");
                     },
                     _ => Err(IrcMessage {
                         tags: tags,
                         prefix: Some(prefix),
                         command: command,
-                        args: args,
-                        suffix: Some(suffix)
                     })
                 }
             },
